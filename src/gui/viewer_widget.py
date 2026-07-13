@@ -1,5 +1,6 @@
 """3D viewer widget using PyVista + Qt."""
 
+import numpy as np
 import pyvista as pv
 import trimesh
 from pyvistaqt import QtInteractor
@@ -11,32 +12,30 @@ class ViewerWidget(QtInteractor):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.set_background("white")
+        self._has_mesh = False
 
     def display_mesh(self, mesh: trimesh.Trimesh, color="lightblue", opacity=1.0):
         """Display a trimesh in the viewer."""
         self.clear()
-        pv_mesh = pv.PolyData(mesh.vertices, mesh.faces)
+        pv_mesh = pv.wrap(mesh)
         self.add_mesh(pv_mesh, color=color, opacity=opacity, show_edges=True)
         self.reset_camera()
+        self._has_mesh = True
 
     def highlight_holes(self, mesh: trimesh.Trimesh, edges: list, color="yellow"):
         """Highlight hole boundary edges as lines."""
-        if not edges:
+        if not edges or not self._has_mesh:
             return
-        lines = []
-        for edge in edges:
-            lines.extend([2, int(edge[0]), int(edge[1])])
-        line_mesh = pv.LineSegments(mesh.vertices, lines)
+        points = np.array([mesh.vertices[e] for e in edges]).reshape(-1, 3)
+        line_mesh = pv.line_segments_from_points(points)
         self.add_mesh(line_mesh, color=color, line_width=3, name="holes")
 
     def highlight_issues(self, mesh: trimesh.Trimesh, edges: list, color="red"):
         """Highlight non-manifold edges as lines."""
-        if not edges:
+        if not edges or not self._has_mesh:
             return
-        lines = []
-        for edge in edges:
-            lines.extend([2, int(edge[0]), int(edge[1])])
-        line_mesh = pv.LineSegments(mesh.vertices, lines)
+        points = np.array([mesh.vertices[e] for e in edges]).reshape(-1, 3)
+        line_mesh = pv.line_segments_from_points(points)
         self.add_mesh(line_mesh, color=color, line_width=3, name="issues")
 
     def clear_overlays(self):
