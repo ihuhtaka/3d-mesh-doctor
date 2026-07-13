@@ -15,7 +15,7 @@ class ViewerWidget(QtInteractor):
     def display_mesh(self, mesh: trimesh.Trimesh, color="lightblue", opacity=1.0):
         """Display a trimesh in the viewer."""
         self.clear()
-        pv_mesh = pv.wrap(mesh.vertices, mesh.faces)
+        pv_mesh = pv.PolyData(mesh.vertices, mesh.faces)
         self.add_mesh(pv_mesh, color=color, opacity=opacity, show_edges=True)
         self.reset_camera()
 
@@ -23,23 +23,20 @@ class ViewerWidget(QtInteractor):
         """Highlight hole boundary edges as lines."""
         if not edges:
             return
-        # Convert edge pairs to line segments for PyVista
-        points = mesh.vertices
         lines = []
         for edge in edges:
             lines.extend([2, int(edge[0]), int(edge[1])])
-        line_mesh = pv.LineSegments(points, lines)
+        line_mesh = pv.LineSegments(mesh.vertices, lines)
         self.add_mesh(line_mesh, color=color, line_width=3, name="holes")
 
     def highlight_issues(self, mesh: trimesh.Trimesh, edges: list, color="red"):
         """Highlight non-manifold edges as lines."""
         if not edges:
             return
-        points = mesh.vertices
         lines = []
         for edge in edges:
             lines.extend([2, int(edge[0]), int(edge[1])])
-        line_mesh = pv.LineSegments(points, lines)
+        line_mesh = pv.LineSegments(mesh.vertices, lines)
         self.add_mesh(line_mesh, color=color, line_width=3, name="issues")
 
     def clear_overlays(self):
