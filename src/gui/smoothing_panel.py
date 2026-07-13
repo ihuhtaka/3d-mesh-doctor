@@ -1,13 +1,13 @@
-"""Smoothing controls panel with sliders."""
+"""Smoothing controls panel."""
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
-    QGroupBox,
+    QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSlider,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -26,47 +26,43 @@ class SmoothingPanel(QWidget):
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(2)
 
-        # Method selector
-        method_layout = QHBoxLayout()
-        method_layout.addWidget(QLabel("Method:"))
+        # Method selector + Iterations on one row
+        row1 = QHBoxLayout()
+        row1.setSpacing(4)
+        row1.addWidget(QLabel("Method:"))
         self.method_combo = QComboBox()
         for method in SmoothMethod:
             self.method_combo.addItem(method.value.title(), method)
-        method_layout.addWidget(self.method_combo)
-        layout.addLayout(method_layout)
+        row1.addWidget(self.method_combo)
+        row1.addWidget(QLabel("Iter:"))
+        self.iter_spin = QSpinBox()
+        self.iter_spin.setRange(1, 100)
+        self.iter_spin.setValue(10)
+        self.iter_spin.setFixedWidth(52)
+        row1.addWidget(self.iter_spin)
+        row1.addStretch()
+        layout.addLayout(row1)
 
-        # Iterations slider
-        iter_group = QGroupBox("Iterations")
-        iter_layout = QVBoxLayout(iter_group)
-        self.iter_slider = QSlider()
-        self.iter_slider.setRange(1, 100)
-        self.iter_slider.setValue(10)
-        self.iter_label = QLabel("10")
-        self.iter_slider.valueChanged.connect(
-            lambda v: self.iter_label.setText(str(v))
-        )
-        iter_layout.addWidget(self.iter_slider)
-        iter_layout.addWidget(self.iter_label)
-        layout.addWidget(iter_group)
+        # Strength on its own row
+        row2 = QHBoxLayout()
+        row2.setSpacing(4)
+        row2.addWidget(QLabel("Strength:"))
+        self.strength_spin = QDoubleSpinBox()
+        self.strength_spin.setRange(0.01, 1.0)
+        self.strength_spin.setSingleStep(0.05)
+        self.strength_spin.setDecimals(2)
+        self.strength_spin.setValue(0.50)
+        self.strength_spin.setFixedWidth(60)
+        row2.addWidget(self.strength_spin)
+        row2.addStretch()
+        layout.addLayout(row2)
 
-        # Strength slider
-        strength_group = QGroupBox("Strength")
-        strength_layout = QVBoxLayout(strength_group)
-        self.strength_slider = QSlider()
-        self.strength_slider.setRange(0, 100)
-        self.strength_slider.setValue(50)
-        self.strength_label = QLabel("0.50")
-        self.strength_slider.valueChanged.connect(
-            lambda v: self.strength_label.setText(f"{v / 100:.2f}")
-        )
-        strength_layout.addWidget(self.strength_slider)
-        strength_layout.addWidget(self.strength_label)
-        layout.addWidget(strength_group)
-
-        # Buttons
+        # Buttons on one row
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(4)
         self.preview_btn = QPushButton("Preview")
         self.preview_btn.clicked.connect(lambda: self.preview_requested.emit(self.get_params()))
         self.apply_btn = QPushButton("Apply")
@@ -76,6 +72,7 @@ class SmoothingPanel(QWidget):
         btn_layout.addWidget(self.preview_btn)
         btn_layout.addWidget(self.apply_btn)
         btn_layout.addWidget(self.reset_btn)
+        btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
     def get_params(self) -> dict:
@@ -83,6 +80,6 @@ class SmoothingPanel(QWidget):
         method = self.method_combo.currentData()
         return {
             "method": method,
-            "iterations": self.iter_slider.value(),
-            "lambd": self.strength_slider.value() / 100.0,
+            "iterations": self.iter_spin.value(),
+            "lambd": self.strength_spin.value(),
         }

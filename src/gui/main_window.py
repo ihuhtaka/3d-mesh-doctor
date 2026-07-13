@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
         self.reduction_panel.preview_requested.connect(self._on_reduce_preview)
         self.reduction_panel.apply_requested.connect(self._on_reduce_apply)
         self.reduction_panel.reset_requested.connect(self._on_reduce_reset)
-        self.reduction_panel.ratio_slider.valueChanged.connect(self._on_ratio_changed)
+        self.reduction_panel.ratio_spin.valueChanged.connect(self._on_ratio_changed)
 
         # Export panel
         self.export_panel.export_requested.connect(self._on_export)
@@ -251,12 +251,12 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Batch Export", msg)
 
     def _on_ratio_changed(self, value: int):
-        """Update the face count estimate when slider moves."""
+        """Update the face count estimate when ratio spinner changes."""
         if self._current_mesh is not None:
             ratio = value / 100.0
             estimated = max(1, int(len(self._current_mesh.faces) * ratio))
             self.reduction_panel.estimate_label.setText(
-                f"Estimated output: {estimated:,} faces"
+                f"Estimated: {estimated:,} faces"
             )
 
     def _on_reduce_preview(self, ratio: float):
