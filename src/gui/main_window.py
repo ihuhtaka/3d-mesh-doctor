@@ -16,10 +16,12 @@ from PySide6.QtWidgets import (
 from src.core.mesh_analyzer import analyze_mesh
 from src.core.mesh_exporter import export_mesh
 from src.core.mesh_loader import load_mesh
+from src.core.mesh_reducer import reduce_polygons
 from src.core.mesh_repairer import RepairOptions, repair_mesh
 from src.core.mesh_smoother import smooth_mesh
 from src.gui.export_panel import ExportPanel
 from src.gui.file_panel import FilePanel
+from src.gui.reduction_panel import ReductionPanel
 from src.gui.repair_panel import RepairPanel
 from src.gui.smoothing_panel import SmoothingPanel
 from src.gui.viewer_widget import ViewerWidget
@@ -48,14 +50,16 @@ class MainWindow(QMainWindow):
         file_dock.setWidget(self.file_panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, file_dock)
 
-        # Right dock: repair + smoothing controls
+        # Right dock: repair + smoothing + reduction controls
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
         self.repair_panel = RepairPanel()
         self.smoothing_panel = SmoothingPanel()
+        self.reduction_panel = ReductionPanel()
         right_layout.addWidget(self.repair_panel)
         right_layout.addWidget(self.smoothing_panel)
+        right_layout.addWidget(self.reduction_panel)
         right_layout.addStretch()
         right_dock = QDockWidget("Controls", self)
         right_dock.setWidget(right_widget)
@@ -87,6 +91,12 @@ class MainWindow(QMainWindow):
         self.smoothing_panel.apply_requested.connect(self._on_smooth_apply)
         self.smoothing_panel.reset_requested.connect(self._on_smooth_reset)
 
+        # Reduction panel
+        self.reduction_panel.preview_requested.connect(self._on_reduce_preview)
+        self.reduction_panel.apply_requested.connect(self._on_reduce_apply)
+        self.reduction_panel.reset_requested.connect(self._on_reduce_reset)
+        self.reduction_panel.ratio_slider.valueChanged.connect(self._on_ratio_changed)
+
         # Export panel
         self.export_panel.export_requested.connect(self._on_export)
         self.export_panel.export_all_requested.connect(self._on_export_all)
@@ -117,6 +127,7 @@ class MainWindow(QMainWindow):
         self._current_path = path
         self.viewer.display_mesh(mesh)
         self.repair_panel.status_text.clear()
+        self.reduction_panel.update_face_counts(len(mesh.faces), len(mesh.vertices))
 
     def _on_file_selected(self, path: Path):
         """Load and display a mesh file."""
@@ -238,3 +249,44 @@ class MainWindow(QMainWindow):
         if errors:
             msg += f"\n\n{len(errors)} error(s):\n" + "\n".join(errors[:5])
         QMessageBox.information(self, "Batch Export", msg)
+
+    def _on_ratio_changed(self, value: int):
+        """Update the face count estimate when slider moves."""
+        if self._current_mesh is not None:
+            ratio = value / 100.0
+            estimated = max(1, int(len(self._current_mesh.faces) * ratio))
+            self.reduction_panel.estimate_label.setText(
+                f"Estimated output: {estimated:,} faces"
+            )
+
+    def _on_reduce_preview(self, ratio: float):
+        """Preview reduction on the current mesh (non-destructive)."""
+        if self._current_mesh is None:
+            return
+        preview = self._current_mesh.copy()
+        reduce_polygons(preview, ratio=ratio)
+        self.viewer.display_mesh(preview, opacity=0.8)
+
+    def _on_reduce_apply(self, ratio: float):
+        """Apply reduction to the current mesh."""
+        if self._current_mesh is None:
+            return
+        original_count = len(self._current_mesh.faces)
+        self._current_mesh = reduce_polygons(self._current_mesh, ratio=ratio)
+        new_count = len(self._current_mesh.faces)
+        self.viewer.display_mesh(self._current_mesh)
+        self.reduction_panel.update_face_counts(new_count, len(self._current_mesh.vertices))
+        self.repair_panel.status_text.setText(
+            f"Reduced: {original_count:,} → {new_count:,} faces "
+            f"({100 - int(ratio * 100)}% reduction)"
+        )
+
+    def _on_reduce_reset(self):
+        """Reset to original mesh."""
+        if self._original_mesh is None:
+            return
+        self._current_mesh = self._original_mesh.copy()
+        self.viewer.display_mesh(self._current_mesh)
+        self.reduction_panel.update_face_counts(
+            len(self._current_mesh.faces), len(self._current_mesh.vertices)
+        )
