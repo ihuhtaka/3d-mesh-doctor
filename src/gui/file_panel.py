@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -18,6 +19,9 @@ from src.core.mesh_loader import SUPPORTED_EXTENSIONS
 
 class FilePanel(QWidget):
     """Panel for managing loaded mesh files."""
+
+    file_selected = Signal(Path)
+    files_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -66,6 +70,10 @@ class FilePanel(QWidget):
             ]
             self._add_paths(files)
 
+    def get_all_paths(self) -> list[Path]:
+        """Return all loaded file paths."""
+        return list(self._file_paths)
+
     def _add_paths(self, paths: list[Path]):
         """Add file paths to the list."""
         for path in paths:
@@ -73,6 +81,7 @@ class FilePanel(QWidget):
                 self._file_paths.append(path)
                 self.file_list.addItem(path.name)
         self._update_status()
+        self.files_changed.emit()
 
     def _update_status(self):
         count = len(self._file_paths)
@@ -81,8 +90,7 @@ class FilePanel(QWidget):
     def _on_file_selected(self, row: int):
         """Handle file selection."""
         if 0 <= row < len(self._file_paths):
-            # Signal to viewer — to be connected in MainWindow
-            pass
+            self.file_selected.emit(self._file_paths[row])
 
     def dragEnterEvent(self, event: QDragEnterEvent):  # noqa: N802
         if event.mimeData().hasUrls():

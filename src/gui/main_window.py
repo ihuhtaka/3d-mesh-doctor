@@ -1,14 +1,24 @@
 """Main application window."""
 
+from pathlib import Path
+
+import trimesh
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QDockWidget,
     QMainWindow,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
 
+from src.core.mesh_analyzer import analyze_mesh
+from src.core.mesh_exporter import export_mesh
+from src.core.mesh_loader import load_mesh
+from src.core.mesh_repairer import RepairOptions, repair_mesh
+from src.core.mesh_smoother import smooth_mesh
+from src.gui.export_panel import ExportPanel
 from src.gui.file_panel import FilePanel
 from src.gui.repair_panel import RepairPanel
 from src.gui.smoothing_panel import SmoothingPanel
@@ -23,6 +33,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("3D Mesh Doctor")
         self.setMinimumSize(1200, 800)
 
+        # Mesh state
+        self._current_mesh: trimesh.Trimesh | None = None
+        self._original_mesh: trimesh.Trimesh | None = None
+        self._current_path: Path | None = None
+
         # Central 3D viewer
         self.viewer = ViewerWidget()
         self.setCentralWidget(self.viewer)
@@ -33,7 +48,7 @@ class MainWindow(QMainWindow):
         file_dock.setWidget(self.file_panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, file_dock)
 
-        # Right dock: repair controls
+        # Right dock: repair + smoothing controls
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -46,8 +61,35 @@ class MainWindow(QMainWindow):
         right_dock.setWidget(right_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, right_dock)
 
+        # Bottom dock: export
+        self.export_panel = ExportPanel()
+        export_dock = QDockWidget("Export", self)
+        export_dock.setWidget(self.export_panel)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, export_dock)
+
+        # Connect signals
+        self._connect_signals()
+
         # Menu bar
         self._create_menus()
+
+    def _connect_signals(self):
+        """Connect all panel signals to handlers."""
+        # File panel
+        self.file_panel.file_selected.connect(self._on_file_selected)
+
+        # Repair panel
+        self.repair_panel.analyze_requested.connect(self._on_analyze)
+        self.repair_panel.repair_requested.connect(self._on_repair)
+
+        # Smoothing panel
+        self.smoothing_panel.preview_requested.connect(self._on_smooth_preview)
+        self.smoothing_panel.apply_requested.connect(self._on_smooth_apply)
+        self.smoothing_panel.reset_requested.connect(self._on_smooth_reset)
+
+        # Export panel
+        self.export_panel.export_requested.connect(self._on_export)
+        self.export_panel.export_all_requested.connect(self._on_export_all)
 
     def _create_menus(self):
         menu_bar = self.menuBar()
@@ -67,3 +109,132 @@ class MainWindow(QMainWindow):
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+
+    def _set_mesh(self, mesh: trimesh.Trimesh, path: Path | None = None):
+        """Update the current mesh and display it."""
+        self._current_mesh = mesh
+        self._original_mesh = mesh.copy()
+        self._current_path = path
+        self.viewer.display_mesh(mesh)
+        self.repair_panel.status_text.clear()
+
+    def _on_file_selected(self, path: Path):
+        """Load and display a mesh file."""
+        try:
+            mesh = load_mesh(path)
+            self._set_mesh(mesh, path)
+        except Exception as e:
+            QMessageBox.warning(self, "Load Error", f"Failed to load {path.name}:\n{e}")
+
+    def _on_analyze(self):
+        """Analyze the current mesh for issues."""
+        if self._current_mesh is None:
+            self.repair_panel.status_text.setText("No mesh loaded.")
+            return
+
+        report = analyze_mesh(self._current_mesh)
+        lines = [
+            f"Faces: {report.face_count}",
+            f"Vertices: {report.vertex_count}",
+            f"Watertight: {'Yes' if report.is_watertight else 'No'}",
+        ]
+        if not report.is_watertight:
+            lines.append(f"Holes detected: {report.hole_count}")
+        if report.non_manifold_edge_count > 0:
+            lines.append(f"Non-manifold edges: {report.non_manifold_edge_count}")
+        if report.has_inverted_normals:
+            lines.append("Warning: Inverted normals detected")
+
+        self.repair_panel.status_text.setText("\n".join(lines))
+
+        # Highlight issues in the viewer
+        self.viewer.clear_overlays()
+        if not report.is_watertight:
+            self.viewer.highlight_holes(self._current_mesh, report.hole_edges)
+
+    def _on_repair(self):
+        """Repair the current mesh."""
+        if self._current_mesh is None:
+            self.repair_panel.status_text.setText("No mesh loaded.")
+            return
+
+        options_dict = self.repair_panel.get_repair_options()
+        options = RepairOptions(**options_dict)
+
+        try:
+            repaired = repair_mesh(self._current_mesh, options)
+            self._current_mesh = repaired
+            self.viewer.display_mesh(repaired)
+            self.viewer.clear_overlays()
+
+            # Show post-repair status
+            report = analyze_mesh(repaired)
+            status = "Repaired successfully."
+            if report.is_watertight:
+                status += "\nMesh is now watertight."
+            else:
+                status += f"\nStill has {report.hole_count} hole(s)."
+            self.repair_panel.status_text.setText(status)
+        except Exception as e:
+            QMessageBox.warning(self, "Repair Error", f"Repair failed:\n{e}")
+
+    def _on_smooth_preview(self, params: dict):
+        """Preview smoothing on the current mesh (non-destructive)."""
+        if self._current_mesh is None:
+            return
+        preview = self._current_mesh.copy()
+        smooth_mesh(preview, **params)
+        self.viewer.display_mesh(preview, opacity=0.8)
+
+    def _on_smooth_apply(self, params: dict):
+        """Apply smoothing to the current mesh."""
+        if self._current_mesh is None:
+            return
+        smooth_mesh(self._current_mesh, **params)
+        self.viewer.display_mesh(self._current_mesh)
+
+    def _on_smooth_reset(self):
+        """Reset to original mesh."""
+        if self._original_mesh is None:
+            return
+        self._current_mesh = self._original_mesh.copy()
+        self.viewer.display_mesh(self._current_mesh)
+
+    def _on_export(self, output_dir: Path, fmt: str):
+        """Export the current mesh."""
+        if self._current_mesh is None:
+            QMessageBox.warning(self, "Export Error", "No mesh loaded.")
+            return
+
+        stem = self._current_path.stem if self._current_path else "mesh"
+        out_path = output_dir / f"{stem}_repaired.{fmt}"
+
+        try:
+            export_mesh(self._current_mesh, out_path)
+            QMessageBox.information(self, "Export Done", f"Saved to {out_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "Export Error", f"Export failed:\n{e}")
+
+    def _on_export_all(self, output_dir: Path, fmt: str):
+        """Export all loaded meshes."""
+        paths = self.file_panel.get_all_paths()
+        if not paths:
+            QMessageBox.warning(self, "Export Error", "No files loaded.")
+            return
+
+        exported = 0
+        errors = []
+        for path in paths:
+            try:
+                mesh = load_mesh(path)
+                repair_mesh(mesh)
+                out_path = output_dir / f"{path.stem}_repaired.{fmt}"
+                export_mesh(mesh, out_path)
+                exported += 1
+            except Exception as e:
+                errors.append(f"{path.name}: {e}")
+
+        msg = f"Exported {exported} file(s)."
+        if errors:
+            msg += f"\n\n{len(errors)} error(s):\n" + "\n".join(errors[:5])
+        QMessageBox.information(self, "Batch Export", msg)

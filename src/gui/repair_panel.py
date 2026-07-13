@@ -1,5 +1,6 @@
 """Repair options and status panel."""
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QGroupBox,
@@ -12,6 +13,9 @@ from PySide6.QtWidgets import (
 
 class RepairPanel(QWidget):
     """Panel for mesh analysis and repair controls."""
+
+    analyze_requested = Signal()
+    repair_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,7 +41,9 @@ class RepairPanel(QWidget):
 
         # Action buttons
         self.analyze_btn = QPushButton("Analyze")
+        self.analyze_btn.clicked.connect(self.analyze_requested)
         self.repair_btn = QPushButton("Repair")
+        self.repair_btn.clicked.connect(self.repair_requested)
         layout.addWidget(self.analyze_btn)
         layout.addWidget(self.repair_btn)
 
@@ -47,3 +53,11 @@ class RepairPanel(QWidget):
         self.status_text.setMaximumHeight(150)
         self.status_text.setPlaceholderText("Analysis results will appear here...")
         layout.addWidget(self.status_text)
+
+    def get_repair_options(self) -> dict:
+        """Get current repair options as a dict."""
+        return {
+            "fill_holes": self.fill_holes_cb.isChecked(),
+            "fix_normals": self.fix_normals_cb.isChecked(),
+            "remove_degenerate": self.remove_degenerate_cb.isChecked(),
+        }

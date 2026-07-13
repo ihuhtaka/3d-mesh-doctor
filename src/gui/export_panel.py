@@ -1,5 +1,8 @@
 """Export panel for saving repaired meshes."""
 
+from pathlib import Path
+
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -14,6 +17,9 @@ from PySide6.QtWidgets import (
 
 class ExportPanel(QWidget):
     """Panel for mesh export controls."""
+
+    export_requested = Signal(Path, str)
+    export_all_requested = Signal(Path, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -42,12 +48,33 @@ class ExportPanel(QWidget):
         # Export buttons
         btn_layout = QHBoxLayout()
         self.export_btn = QPushButton("Export")
+        self.export_btn.clicked.connect(self._on_export)
         self.export_all_btn = QPushButton("Export All")
+        self.export_all_btn.clicked.connect(self._on_export_all)
         btn_layout.addWidget(self.export_btn)
         btn_layout.addWidget(self.export_all_btn)
         layout.addLayout(btn_layout)
+
+    def get_output_dir(self) -> Path | None:
+        """Get the output directory path, or None if not set."""
+        text = self.dir_edit.text().strip()
+        return Path(text) if text else None
+
+    def get_format(self) -> str:
+        """Get the selected export format."""
+        return self.format_combo.currentText().lower()
 
     def _browse_directory(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if folder:
             self.dir_edit.setText(folder)
+
+    def _on_export(self):
+        output_dir = self.get_output_dir()
+        if output_dir:
+            self.export_requested.emit(output_dir, self.get_format())
+
+    def _on_export_all(self):
+        output_dir = self.get_output_dir()
+        if output_dir:
+            self.export_all_requested.emit(output_dir, self.get_format())

@@ -10,9 +10,7 @@ class ViewerWidget(QtInteractor):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._current_mesh_actor = None
-        self._issue_actor = None
-        self._hole_actor = None
+        self.set_background("white")
 
     def display_mesh(self, mesh: trimesh.Trimesh, color="lightblue", opacity=1.0):
         """Display a trimesh in the viewer."""
@@ -21,35 +19,31 @@ class ViewerWidget(QtInteractor):
         self.add_mesh(pv_mesh, color=color, opacity=opacity, show_edges=True)
         self.reset_camera()
 
-    def highlight_issues(self, mesh: trimesh.Trimesh, edges: list, color="red"):
-        """Highlight non-manifold edges as wireframe overlay."""
-        if not edges:
-            return
-        pv_mesh = pv.wrap(mesh.vertices, mesh.faces)
-        self.add_mesh(
-            pv_mesh,
-            style="wireframe",
-            color=color,
-            opacity=0.3,
-            name="issues",
-        )
-
     def highlight_holes(self, mesh: trimesh.Trimesh, edges: list, color="yellow"):
-        """Highlight hole boundaries."""
+        """Highlight hole boundary edges as lines."""
         if not edges:
             return
-        pv_mesh = pv.wrap(mesh.vertices, mesh.faces)
-        self.add_mesh(
-            pv_mesh,
-            style="wireframe",
-            color=color,
-            opacity=0.3,
-            name="holes",
-        )
+        # Convert edge pairs to line segments for PyVista
+        points = mesh.vertices
+        lines = []
+        for edge in edges:
+            lines.extend([2, int(edge[0]), int(edge[1])])
+        line_mesh = pv.LineSegments(points, lines)
+        self.add_mesh(line_mesh, color=color, line_width=3, name="holes")
+
+    def highlight_issues(self, mesh: trimesh.Trimesh, edges: list, color="red"):
+        """Highlight non-manifold edges as lines."""
+        if not edges:
+            return
+        points = mesh.vertices
+        lines = []
+        for edge in edges:
+            lines.extend([2, int(edge[0]), int(edge[1])])
+        line_mesh = pv.LineSegments(points, lines)
+        self.add_mesh(line_mesh, color=color, line_width=3, name="issues")
 
     def clear_overlays(self):
         """Remove issue/hole overlays."""
-        if "issues" in self.actors:
-            del self.actors["issues"]
-        if "holes" in self.actors:
-            del self.actors["holes"]
+        for name in ["issues", "holes"]:
+            if name in self.actors:
+                self.remove_actor(name)
