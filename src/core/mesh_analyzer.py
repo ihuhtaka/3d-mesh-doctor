@@ -35,43 +35,32 @@ def analyze_mesh(mesh: trimesh.Trimesh) -> MeshReport:
     MeshReport
         Analysis results.
     """
-    # Watertight check
     is_watertight = mesh.is_watertight
-
-    # Face and vertex counts
     face_count = len(mesh.faces)
     vertex_count = len(mesh.vertices)
-
-    # Volume and surface area (only meaningful for watertight meshes)
     volume = mesh.volume if is_watertight else 0.0
     surface_area = mesh.area
-
-    # Inverted normals
     has_inverted_normals = bool(np.any(mesh.face_normals[:, 2] < 0))
 
-    # Non-manifold edges: edges shared by != 2 faces
-    edge_face_count = mesh.edges_face
-    unique_edges, counts = np.unique(edge_face_count, axis=0, return_counts=True)
-    # edges_face gives face pairs; non-manifold if an edge index appears > 2 times
-    # Actually, let's use trimesh's built-in checks
-    non_manifold_edge_count = int(
-        np.sum(mesh.edges_face[:, 1] == -1) if mesh.edges_face.shape[1] > 1 else 0
-    )
-
-    # Holes: boundary edges (edges with only one adjacent face)
-    holes = 0
+    # Detect boundary edges (holes) using edges_sorted
+    hole_count = 0
     hole_edges_list: list = []
+    non_manifold_edge_count = 0
     non_manifold_edges_list: list = []
 
-    if hasattr(mesh, "edges_sorted") and hasattr(mesh, "faces"):
-        # Count edges shared by only one face = boundary edges = holes
+    if face_count > 0:
         edges_sorted = mesh.edges_sorted
-        # Find edges that appear only once (boundary)
-        unique, counts = np.unique(edges_sorted, axis=0, return_counts=True)
+        unique_edges, counts = np.unique(edges_sorted, axis=0, return_counts=True)
+        # Boundary edges appear exactly once
         boundary_mask = counts == 1
-        boundary_edges = unique[boundary_mask]
-        holes = len(boundary_edges) // 2 if len(boundary_edges) > 0 else 0
+        boundary_edges = unique_edges[boundary_mask]
+        hole_count = len(boundary_edges) // 2 if len(boundary_edges) > 0 else 0
         hole_edges_list = boundary_edges.tolist()
+
+        # Non-manifold edges appear more than twice
+        non_manifold_mask = counts > 2
+        non_manifold_edge_count = int(np.sum(non_manifold_mask))
+        non_manifold_edges_list = unique_edges[non_manifold_mask].tolist()
 
     return MeshReport(
         is_watertight=is_watertight,
@@ -81,7 +70,7 @@ def analyze_mesh(mesh: trimesh.Trimesh) -> MeshReport:
         surface_area=surface_area,
         has_inverted_normals=has_inverted_normals,
         non_manifold_edge_count=non_manifold_edge_count,
-        hole_count=holes,
+        hole_count=hole_count,
         hole_edges=hole_edges_list,
         non_manifold_edges=non_manifold_edges_list,
     )

@@ -26,14 +26,11 @@ def reduce_polygons(
 
     if ratio is not None:
         ratio = max(0.01, min(1.0, ratio))
-        target_face_count = max(1, int(original_count * ratio))
-    elif target_face_count is None:
-        return mesh
+        if ratio < 1.0:
+            mesh = mesh.simplify_quadric_decimation(percent=ratio)
+    elif target_face_count is not None:
+        target_face_count = max(1, min(original_count, target_face_count))
+        if target_face_count < original_count:
+            mesh = mesh.simplify_quadric_decimation(face_count=target_face_count)
 
-    target_face_count = max(1, min(original_count, target_face_count))
-
-    if target_face_count >= original_count:
-        return mesh
-
-    mesh = mesh.simplify_quadric_decimation(target_face_count)
     return mesh

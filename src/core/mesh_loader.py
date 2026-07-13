@@ -4,7 +4,6 @@ from pathlib import Path
 
 import trimesh
 
-
 SUPPORTED_EXTENSIONS = {".stl", ".obj"}
 
 

@@ -37,14 +37,15 @@ def repair_mesh(
         options = RepairOptions()
 
     if options.remove_duplicates:
-        mesh.remove_duplicate_faces()
         mesh.remove_unreferenced_vertices()
 
     if options.merge_vertices:
         mesh.merge_vertices()
 
     if options.remove_degenerate:
-        mesh.remove_degenerate_faces()
+        # Remove degenerate faces (zero-area triangles)
+        mask = mesh.nondegenerate_faces()
+        mesh.update_faces(mask)
 
     if options.fix_normals:
         mesh.fix_normals()

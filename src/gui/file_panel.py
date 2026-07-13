@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -85,11 +84,11 @@ class FilePanel(QWidget):
             # Signal to viewer — to be connected in MainWindow
             pass
 
-    def dragEnterEvent(self, event: QDragEnterEvent):
+    def dragEnterEvent(self, event: QDragEnterEvent):  # noqa: N802
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
-    def dropEvent(self, event: QDropEvent):
+    def dropEvent(self, event: QDropEvent):  # noqa: N802
         paths = []
         for url in event.mimeData().urls():
             path = Path(url.toLocalFile())

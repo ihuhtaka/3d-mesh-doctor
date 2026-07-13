@@ -7,7 +7,7 @@ from PySide6.QtCore import QThread, Signal
 from src.core.mesh_exporter import export_mesh
 from src.core.mesh_loader import load_mesh
 from src.core.mesh_repairer import RepairOptions, repair_mesh
-from src.core.mesh_smoother import SmoothMethod, smooth_mesh
+from src.core.mesh_smoother import smooth_mesh
 
 
 class BatchProcessor(QThread):

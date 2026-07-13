@@ -1,6 +1,5 @@
 """3D viewer widget using PyVista + Qt."""
 
-import numpy as np
 import pyvista as pv
 import trimesh
 from pyvistaqt import QtInteractor

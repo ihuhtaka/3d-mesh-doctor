@@ -34,7 +34,7 @@ def smooth_mesh(
     lambd : float
         Smoothing strength (0.0-1.0). Higher = more smoothing.
     mu : float
-        Taubin/Humphrey anti-shrinkage parameter (0.0-1.0).
+        Anti-shrinkage parameter (0.0-1.0). Used by Taubin and Humphrey.
 
     Returns
     -------
@@ -46,10 +46,10 @@ def smooth_mesh(
     mu = max(0.0, min(1.0, mu))
 
     if method == SmoothMethod.LAPLACIAN:
-        smoothing.filter_laplacian(mesh, lambd=lambd, iterations=iterations)
+        smoothing.filter_laplacian(mesh, lamb=lambd, iterations=iterations)
     elif method == SmoothMethod.TAUBIN:
-        smoothing.filter_taubin(mesh, lambd=lambd, mu=mu, iterations=iterations)
+        smoothing.filter_taubin(mesh, lamb=lambd, nu=mu, iterations=iterations)
     elif method == SmoothMethod.HUMPHREY:
-        smoothing.filter_humphrey(mesh, lambd=lambd, mu=mu, iterations=iterations)
+        smoothing.filter_humphrey(mesh, alpha=lambd, beta=mu, iterations=iterations)
 
     return mesh
