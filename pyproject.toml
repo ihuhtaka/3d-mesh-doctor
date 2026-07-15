@@ -5,7 +5,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 [project]
 name = "3d-mesh-doctor"
 version = "0.1.0"
-description = "Python GUI tool for repairing, smoothing, and optimizing 3D scans for printing"
+description = "Python GUI tool for repairing, smoothing, and optimizing 3D meshes for printing"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

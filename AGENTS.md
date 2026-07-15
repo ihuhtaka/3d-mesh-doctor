@@ -2,15 +2,17 @@
 
 ## Project
 
-**3D Mesh Doctor** — Python GUI tool (PySide6 + PyVista) that opens head scans (STL/OBJ), checks mesh watertightness, repairs holes/non-manifold edges, smooths, reduces polygon count, and exports for 3D printing. Supports batch processing.
+**3D Mesh Doctor** — Python GUI tool (PySide6 + PyVista) that opens 3D meshes and scans (STL/OBJ), checks mesh watertightness, repairs holes/non-manifold edges, smooths, reduces polygon count, and exports for 3D printing. Supports batch processing and CLI.
 
 GitHub: https://github.com/ihuhtaka/3d-mesh-doctor
 
 ## Architecture
 
-- `src/core/` — Pure mesh processing (no GUI deps): loader, analyzer, repairer, smoother, reducer, exporter
-- `src/gui/` — PySide6 GUI: main window, PyVista 3D viewer, file panel, repair/smoothing/export panels
+- `src/core/` — Pure mesh processing (no GUI deps): loader, analyzer, repairer, smoother, reducer, exporter, metrics
+- `src/gui/` — PySide6 GUI: main window, PyVista 3D viewer, file panel, repair/smoothing/reduction/export panels
 - `src/batch/` — Background batch processing via QThread
+- `src/cli.py` — CLI entry point for headless batch processing
+- `scans/` — Example meshes with known issues for testing
 - `tests/` — pytest tests (fixtures in `tests/fixtures/`)
 
 ## Dev Commands

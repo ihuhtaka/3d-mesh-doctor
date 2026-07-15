@@ -1,6 +1,6 @@
 # 3D Mesh Doctor
 
-Python GUI and CLI tool for repairing, smoothing, and optimizing 3D head scans for 3D printing.
+Python GUI and CLI tool for repairing, smoothing, and optimizing 3D meshes and scans for 3D printing.
 
 Built with **PySide6** + **PyVista** for interactive 3D visualization, and **trimesh** for mesh processing.
 
@@ -160,6 +160,35 @@ analyze:
   file                    Mesh file to analyze
 ```
 
+## Example Meshes
+
+The `scans/` directory contains example meshes with known issues for testing:
+
+| File | Issue | Use for |
+|------|-------|---------|
+| `sphere_with_holes.stl` | 3 circular holes cut out (non-watertight) | Repair / hole filling |
+| `torus_high_poly.stl` | 2048 faces, clean geometry | Polygon reduction |
+| `cube_inverted_normals.stl` | Top face normals flipped | Normal repair |
+| `ear_canal.stl` | Tapered tube, open ends (non-watertight) | Real-world scan shape |
+| `bumpy_sphere.stl` | Surface noise on a sphere | Smoothing |
+| `overlapping_cubes.stl` | Two intersecting cubes | Non-manifold edges |
+
+Try them:
+
+```bash
+# Analyze an example
+mesh-doctor-cli analyze scans/sphere_with_holes.stl
+
+# Repair and export
+mesh-doctor-cli batch scans/ -o output/ --fill-holes --fix-normals --format stl
+
+# Full pipeline: repair + smooth + reduce
+mesh-doctor-cli batch scans/ -o output/ \
+  --fill-holes --fix-normals --remove-degenerate \
+  --smooth taubin -i 10 -s 0.5 \
+  --reduce 50
+```
+
 ## Development
 
 ### Project Structure
@@ -186,6 +215,7 @@ src/
     processor.py          QThread-based batch processor
   cli.py                  CLI entry point
   main.py                 GUI entry point
+scans/                    Example meshes with known issues
 tests/
   conftest.py             Test fixtures (sphere, cube, cylinder, etc.)
   test_mesh_loader.py     6 tests
