@@ -18,6 +18,7 @@ class ReductionPanel(QWidget):
     apply_requested = Signal(float)
     reset_requested = Signal()
     distortion_toggled = Signal(bool)
+    distortion_limit_changed = Signal(float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,6 +57,22 @@ class ReductionPanel(QWidget):
         row2.addWidget(self.distortion_btn)
         layout.addLayout(row2)
 
+        # Distortion limit
+        row3 = QHBoxLayout()
+        row3.setSpacing(4)
+        row3.addWidget(QLabel("Limit:"))
+        self.distortion_limit_spin = QSpinBox()
+        self.distortion_limit_spin.setRange(1, 100000)
+        self.distortion_limit_spin.setValue(500)
+        self.distortion_limit_spin.setSuffix(" um")
+        self.distortion_limit_spin.setFixedWidth(80)
+        self.distortion_limit_spin.valueChanged.connect(
+            lambda v: self.distortion_limit_changed.emit(v / 1000.0)
+        )
+        row3.addWidget(self.distortion_limit_spin)
+        row3.addStretch()
+        layout.addLayout(row3)
+
         # Buttons on one row
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(4)
@@ -74,6 +91,10 @@ class ReductionPanel(QWidget):
     def get_ratio(self) -> float:
         """Get the current reduction ratio (0.0-1.0)."""
         return self.ratio_spin.value() / 100.0
+
+    def get_distortion_limit(self) -> float:
+        """Get the current distortion limit in meters."""
+        return self.distortion_limit_spin.value() / 1000.0
 
     def update_face_counts(self, face_count: int, vertex_count: int):
         """Update the displayed face/vertex counts."""

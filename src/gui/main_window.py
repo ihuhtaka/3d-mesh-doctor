@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
         self.reduction_panel.reset_requested.connect(self._on_reduce_reset)
         self.reduction_panel.ratio_spin.valueChanged.connect(self._on_ratio_changed)
         self.reduction_panel.distortion_toggled.connect(self._on_distortion_toggled)
+        self.reduction_panel.distortion_limit_changed.connect(self._on_distortion_limit_changed)
 
         # Export panel
         self.export_panel.export_requested.connect(self._on_export)
@@ -290,9 +291,23 @@ class MainWindow(QMainWindow):
             return
         self._distortion_active = checked
         if checked:
-            self.viewer.display_distortion(self._original_mesh, self._current_mesh)
+            limit = self.reduction_panel.get_distortion_limit()
+            self.viewer.display_distortion(
+                self._original_mesh, self._current_mesh, limit=limit
+            )
         else:
             self.viewer.display_mesh(self._current_mesh, reset_camera=False)
+
+    def _on_distortion_limit_changed(self, limit: float):
+        """Update distortion visualization when limit changes."""
+        if (
+            self._distortion_active
+            and self._original_mesh is not None
+            and self._current_mesh is not None
+        ):
+            self.viewer.display_distortion(
+                self._original_mesh, self._current_mesh, limit=limit
+            )
 
     def _on_export(self, output_dir: Path, fmt: str):
         """Export the current mesh."""

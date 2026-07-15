@@ -51,9 +51,21 @@ class ViewerWidget(QtInteractor):
         self._has_mesh = True
 
     def display_distortion(
-        self, original: trimesh.Trimesh, processed: trimesh.Trimesh, reset_camera=False
+        self,
+        original: trimesh.Trimesh,
+        processed: trimesh.Trimesh,
+        reset_camera=False,
+        limit: float | None = None,
     ):
-        """Display processed mesh colored by vertex distance to original."""
+        """Display processed mesh colored by vertex distance to original.
+
+        Parameters
+        ----------
+        limit : float, optional
+            Symmetric color range in meters. Colors map from -limit to +limit.
+            Values beyond the range are clamped (saturated red/blue).
+            If None, uses auto-scaling (percentile-based).
+        """
         if not reset_camera and self._has_mesh:
             self._save_camera()
         self.clear()
@@ -62,15 +74,21 @@ class ViewerWidget(QtInteractor):
         _, distances, _ = trimesh.proximity.ProximityQuery(original).on_surface(processed.vertices)
         distances = np.asarray(distances)
 
-        pv_mesh["distance"] = distances
-
-        if len(distances) > 0 and np.max(distances) > 0:
-            vmin = float(np.percentile(distances, 2))
-            vmax = float(np.percentile(distances, 98))
-            if vmax <= vmin:
-                vmax = vmin + 1e-6
+        if limit is not None and limit > 0:
+            clamped = np.clip(distances, -limit, limit)
+            pv_mesh["distance"] = clamped
+            vmin, vmax = -limit, limit
+            title = f"Dist (±{limit * 1000:.0f} um)"
         else:
-            vmin, vmax = 0.0, 1.0
+            pv_mesh["distance"] = distances
+            if len(distances) > 0 and np.max(distances) > 0:
+                vmin = float(np.percentile(distances, 2))
+                vmax = float(np.percentile(distances, 98))
+                if vmax <= vmin:
+                    vmax = vmin + 1e-6
+            else:
+                vmin, vmax = 0.0, 1.0
+            title = f"Distance ({vmin:.4f} — {vmax:.4f})"
 
         self.add_mesh(
             pv_mesh,
@@ -79,7 +97,7 @@ class ViewerWidget(QtInteractor):
             clim=[vmin, vmax],
             show_edges=False,
             opacity=0.95,
-            scalar_bar_args={"title": f"Distance ({vmin:.4f} — {vmax:.4f})"},
+            scalar_bar_args={"title": title},
         )
         if reset_camera:
             self.reset_camera()
