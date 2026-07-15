@@ -97,10 +97,12 @@ def bumpy_sphere():
 
 
 def overlapping_cubes():
-    """Two overlapping cubes — non-manifold edges at intersection."""
-    c1 = trimesh.creation.box(extents=[1, 1, 1], offset=[-0.3, 0, 0])
-    c2 = trimesh.creation.box(extents=[1, 1, 1], offset=[0.3, 0, 0])
+    """Two cubes sharing an edge — non-manifold edges at the junction."""
+    c1 = trimesh.creation.box(extents=[1, 1, 1])
+    c2 = trimesh.creation.box(extents=[1, 1, 1])
+    c2.apply_translation([1.0, 0, 0])
     merged = trimesh.util.concatenate([c1, c2])
+    merged.merge_vertices()
     merged.export(f"{OUT}/overlapping_cubes.stl")
     print(f"  overlapping_cubes.stl  ({len(merged.faces)} faces, non-manifold edges)")
 
