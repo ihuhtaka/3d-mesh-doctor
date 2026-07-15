@@ -31,8 +31,12 @@ htmlcov/
 .coverage
 coverage.xml
 
-# Project specific
+# Project specific — ignore mesh files except in scans/
 *.stl
 *.obj
 *.ply
 *.3mf
+!scans/*.stl
+!scans/*.obj
+!scans/*.ply
+!scans/*.3mf
