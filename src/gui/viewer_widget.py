@@ -30,7 +30,7 @@ class ViewerWidget(QtInteractor):
         self.clear()
         pv_mesh = pv.wrap(processed)
 
-        _, distances, _ = trimesh.proximity.ProximityQuery(original).on_vertices(processed.vertices)
+        _, distances, _ = trimesh.proximity.ProximityQuery(original).on_surface(processed.vertices)
         distances = np.asarray(distances)
 
         pv_mesh["distance"] = distances

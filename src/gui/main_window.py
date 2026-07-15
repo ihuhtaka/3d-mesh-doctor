@@ -48,9 +48,9 @@ class MainWindow(QMainWindow):
 
         # Left dock: file list
         self.file_panel = FilePanel()
-        file_dock = QDockWidget("Files", self)
-        file_dock.setWidget(self.file_panel)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, file_dock)
+        self.file_dock = QDockWidget("Files", self)
+        self.file_dock.setWidget(self.file_panel)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.file_dock)
 
         # Right dock: repair + smoothing + reduction controls
         right_widget = QWidget()
@@ -63,15 +63,15 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.smoothing_panel)
         right_layout.addWidget(self.reduction_panel)
         right_layout.addStretch()
-        right_dock = QDockWidget("Controls", self)
-        right_dock.setWidget(right_widget)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, right_dock)
+        self.controls_dock = QDockWidget("Controls", self)
+        self.controls_dock.setWidget(right_widget)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.controls_dock)
 
         # Bottom dock: export
         self.export_panel = ExportPanel()
-        export_dock = QDockWidget("Export", self)
-        export_dock.setWidget(self.export_panel)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, export_dock)
+        self.export_dock = QDockWidget("Export", self)
+        self.export_dock.setWidget(self.export_panel)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.export_dock)
 
         # Connect signals
         self._connect_signals()
@@ -122,6 +122,19 @@ class MainWindow(QMainWindow):
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+
+        # View menu — panel toggles
+        view_menu = menu_bar.addMenu("View")
+        for label, dock in [
+            ("Files", self.file_dock),
+            ("Controls", self.controls_dock),
+            ("Export", self.export_dock),
+        ]:
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setChecked(dock.isVisible())
+            action.toggled.connect(dock.setVisible)
+            view_menu.addAction(action)
 
     def _show_quality(self, label: str):
         """Compute and display quality metrics comparing original to current."""

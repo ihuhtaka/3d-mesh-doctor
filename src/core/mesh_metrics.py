@@ -55,7 +55,7 @@ def compute_quality(original: trimesh.Trimesh, processed: trimesh.Trimesh) -> Me
         roughness = 1.0
 
     orig_query = trimesh.proximity.ProximityQuery(original)
-    _, proc_dists, _ = orig_query.on_vertices(processed.vertices)
+    _, proc_dists, _ = orig_query.on_surface(processed.vertices)
     proc_dists = np.asarray(proc_dists)
     max_hausdorff = float(np.max(proc_dists)) if len(proc_dists) > 0 else 0.0
     mean_chamfer = float(np.mean(proc_dists)) if len(proc_dists) > 0 else 0.0
