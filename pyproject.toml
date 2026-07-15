@@ -42,6 +42,7 @@ dev = [
 
 [project.scripts]
 mesh-doctor = "src.main:main"
+mesh-doctor-cli = "src.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

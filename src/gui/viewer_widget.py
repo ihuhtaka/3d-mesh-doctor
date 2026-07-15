@@ -14,12 +14,35 @@ class ViewerWidget(QtInteractor):
         self.set_background("white")
         self._has_mesh = False
 
-    def display_mesh(self, mesh: trimesh.Trimesh, color="lightblue", opacity=1.0):
+    def display_mesh(
+        self, mesh: trimesh.Trimesh, color="lightblue", opacity=1.0, reset_camera=True
+    ):
         """Display a trimesh in the viewer."""
         self.clear()
         pv_mesh = pv.wrap(mesh)
         self.add_mesh(pv_mesh, color=color, opacity=opacity, show_edges=True)
-        self.reset_camera()
+        if reset_camera:
+            self.reset_camera()
+        self._has_mesh = True
+
+    def display_distortion(self, original: trimesh.Trimesh, processed: trimesh.Trimesh):
+        """Display processed mesh colored by vertex distance to original."""
+        self.clear()
+        pv_mesh = pv.wrap(processed)
+
+        _, distances, _ = trimesh.proximity.ProximityQuery(original).on_vertices(processed.vertices)
+        distances = np.asarray(distances)
+
+        pv_mesh["distance"] = distances
+
+        self.add_mesh(
+            pv_mesh,
+            scalars="distance",
+            cmap="coolwarm",
+            show_edges=False,
+            opacity=0.95,
+            scalar_bar_args={"title": "Distance to original"},
+        )
         self._has_mesh = True
 
     def highlight_holes(self, mesh: trimesh.Trimesh, edges: list, color="yellow"):

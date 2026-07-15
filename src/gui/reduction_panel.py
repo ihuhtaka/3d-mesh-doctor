@@ -17,6 +17,7 @@ class ReductionPanel(QWidget):
     preview_requested = Signal(float)
     apply_requested = Signal(float)
     reset_requested = Signal()
+    distortion_toggled = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -42,9 +43,18 @@ class ReductionPanel(QWidget):
         row1.addWidget(self.ratio_spin)
         layout.addLayout(row1)
 
-        # Estimate label
+        # Estimate + distortion toggle
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
         self.estimate_label = QLabel("Estimated: — faces")
-        layout.addWidget(self.estimate_label)
+        row2.addWidget(self.estimate_label)
+        row2.addStretch()
+        self.distortion_btn = QPushButton("Show Diff")
+        self.distortion_btn.setCheckable(True)
+        self.distortion_btn.setFixedWidth(72)
+        self.distortion_btn.toggled.connect(self.distortion_toggled)
+        row2.addWidget(self.distortion_btn)
+        layout.addLayout(row2)
 
         # Buttons on one row
         btn_layout = QHBoxLayout()

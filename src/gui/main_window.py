@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from src.core.mesh_analyzer import analyze_mesh
 from src.core.mesh_exporter import export_mesh
 from src.core.mesh_loader import load_mesh
+from src.core.mesh_metrics import compute_quality
 from src.core.mesh_reducer import reduce_polygons
 from src.core.mesh_repairer import RepairOptions, repair_mesh
 from src.core.mesh_smoother import smooth_mesh
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         self._current_mesh: trimesh.Trimesh | None = None
         self._original_mesh: trimesh.Trimesh | None = None
         self._current_path: Path | None = None
+        self._distortion_active = False
 
         # Central 3D viewer
         self.viewer = ViewerWidget()
@@ -96,6 +98,7 @@ class MainWindow(QMainWindow):
         self.reduction_panel.apply_requested.connect(self._on_reduce_apply)
         self.reduction_panel.reset_requested.connect(self._on_reduce_reset)
         self.reduction_panel.ratio_spin.valueChanged.connect(self._on_ratio_changed)
+        self.reduction_panel.distortion_toggled.connect(self._on_distortion_toggled)
 
         # Export panel
         self.export_panel.export_requested.connect(self._on_export)
@@ -120,14 +123,33 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
+    def _show_quality(self, label: str):
+        """Compute and display quality metrics comparing original to current."""
+        if self._original_mesh is None or self._current_mesh is None:
+            return
+        q = compute_quality(self._original_mesh, self._current_mesh)
+        text = (
+            f"{label}\n"
+            f"Faces: {q.original_faces:,} → {q.processed_faces:,}\n"
+            f"Vertices: {q.original_vertices:,} → {q.processed_vertices:,}\n"
+            f"Volume diff: {q.volume_diff_pct:.2f}%\n"
+            f"Area diff: {q.area_diff_pct:.2f}%\n"
+            f"Roughness: {q.roughness:.3f}\n"
+            f"Hausdorff: {q.max_hausdorff:.6f}\n"
+            f"Chamfer: {q.mean_chamfer:.6f}"
+        )
+        self.repair_panel.status_text.setText(text)
+
     def _set_mesh(self, mesh: trimesh.Trimesh, path: Path | None = None):
         """Update the current mesh and display it."""
         self._current_mesh = mesh
         self._original_mesh = mesh.copy()
         self._current_path = path
-        self.viewer.display_mesh(mesh)
+        self.viewer.display_mesh(mesh, reset_camera=True)
         self.repair_panel.status_text.clear()
         self.reduction_panel.update_face_counts(len(mesh.faces), len(mesh.vertices))
+        self._distortion_active = False
+        self.reduction_panel.distortion_btn.setChecked(False)
 
     def _on_file_selected(self, path: Path):
         """Load and display a mesh file."""
@@ -158,7 +180,6 @@ class MainWindow(QMainWindow):
 
         self.repair_panel.status_text.setText("\n".join(lines))
 
-        # Highlight issues in the viewer
         self.viewer.clear_overlays()
         if not report.is_watertight:
             self.viewer.highlight_holes(self._current_mesh, report.hole_edges)
@@ -175,17 +196,9 @@ class MainWindow(QMainWindow):
         try:
             repaired = repair_mesh(self._current_mesh, options)
             self._current_mesh = repaired
-            self.viewer.display_mesh(repaired)
+            self.viewer.display_mesh(repaired, reset_camera=False)
             self.viewer.clear_overlays()
-
-            # Show post-repair status
-            report = analyze_mesh(repaired)
-            status = "Repaired successfully."
-            if report.is_watertight:
-                status += "\nMesh is now watertight."
-            else:
-                status += f"\nStill has {report.hole_count} hole(s)."
-            self.repair_panel.status_text.setText(status)
+            self._show_quality("Repaired successfully")
         except Exception as e:
             QMessageBox.warning(self, "Repair Error", f"Repair failed:\n{e}")
 
@@ -195,14 +208,15 @@ class MainWindow(QMainWindow):
             return
         preview = self._current_mesh.copy()
         smooth_mesh(preview, **params)
-        self.viewer.display_mesh(preview, opacity=0.8)
+        self.viewer.display_mesh(preview, opacity=0.8, reset_camera=False)
 
     def _on_smooth_apply(self, params: dict):
         """Apply smoothing to the current mesh."""
         if self._current_mesh is None:
             return
         smooth_mesh(self._current_mesh, **params)
-        self.viewer.display_mesh(self._current_mesh)
+        self.viewer.display_mesh(self._current_mesh, reset_camera=False)
+        self._show_quality("Smoothed")
 
     def _on_smooth_reset(self):
         """Reset to original mesh."""
@@ -210,6 +224,62 @@ class MainWindow(QMainWindow):
             return
         self._current_mesh = self._original_mesh.copy()
         self.viewer.display_mesh(self._current_mesh)
+        self.repair_panel.status_text.clear()
+        self._distortion_active = False
+        self.reduction_panel.distortion_btn.setChecked(False)
+
+    def _on_ratio_changed(self, value: int):
+        """Update the face count estimate when ratio spinner changes."""
+        if self._current_mesh is not None:
+            ratio = value / 100.0
+            estimated = max(1, int(len(self._current_mesh.faces) * ratio))
+            self.reduction_panel.estimate_label.setText(
+                f"Estimated: {estimated:,} faces"
+            )
+
+    def _on_reduce_preview(self, ratio: float):
+        """Preview reduction on the current mesh (non-destructive)."""
+        if self._current_mesh is None:
+            return
+        preview = self._current_mesh.copy()
+        reduce_polygons(preview, ratio=ratio)
+        self.viewer.display_mesh(preview, opacity=0.8, reset_camera=False)
+
+    def _on_reduce_apply(self, ratio: float):
+        """Apply reduction to the current mesh."""
+        if self._current_mesh is None:
+            return
+        self._current_mesh = reduce_polygons(self._current_mesh, ratio=ratio)
+        self.viewer.display_mesh(self._current_mesh, reset_camera=False)
+        self.reduction_panel.update_face_counts(
+            len(self._current_mesh.faces), len(self._current_mesh.vertices)
+        )
+        self._show_quality("Reduced")
+        self._distortion_active = False
+        self.reduction_panel.distortion_btn.setChecked(False)
+
+    def _on_reduce_reset(self):
+        """Reset to original mesh."""
+        if self._original_mesh is None:
+            return
+        self._current_mesh = self._original_mesh.copy()
+        self.viewer.display_mesh(self._current_mesh)
+        self.reduction_panel.update_face_counts(
+            len(self._current_mesh.faces), len(self._current_mesh.vertices)
+        )
+        self.repair_panel.status_text.clear()
+        self._distortion_active = False
+        self.reduction_panel.distortion_btn.setChecked(False)
+
+    def _on_distortion_toggled(self, checked: bool):
+        """Toggle distortion visualization."""
+        if self._original_mesh is None or self._current_mesh is None:
+            return
+        self._distortion_active = checked
+        if checked:
+            self.viewer.display_distortion(self._original_mesh, self._current_mesh)
+        else:
+            self.viewer.display_mesh(self._current_mesh, reset_camera=False)
 
     def _on_export(self, output_dir: Path, fmt: str):
         """Export the current mesh."""
@@ -249,44 +319,3 @@ class MainWindow(QMainWindow):
         if errors:
             msg += f"\n\n{len(errors)} error(s):\n" + "\n".join(errors[:5])
         QMessageBox.information(self, "Batch Export", msg)
-
-    def _on_ratio_changed(self, value: int):
-        """Update the face count estimate when ratio spinner changes."""
-        if self._current_mesh is not None:
-            ratio = value / 100.0
-            estimated = max(1, int(len(self._current_mesh.faces) * ratio))
-            self.reduction_panel.estimate_label.setText(
-                f"Estimated: {estimated:,} faces"
-            )
-
-    def _on_reduce_preview(self, ratio: float):
-        """Preview reduction on the current mesh (non-destructive)."""
-        if self._current_mesh is None:
-            return
-        preview = self._current_mesh.copy()
-        reduce_polygons(preview, ratio=ratio)
-        self.viewer.display_mesh(preview, opacity=0.8)
-
-    def _on_reduce_apply(self, ratio: float):
-        """Apply reduction to the current mesh."""
-        if self._current_mesh is None:
-            return
-        original_count = len(self._current_mesh.faces)
-        self._current_mesh = reduce_polygons(self._current_mesh, ratio=ratio)
-        new_count = len(self._current_mesh.faces)
-        self.viewer.display_mesh(self._current_mesh)
-        self.reduction_panel.update_face_counts(new_count, len(self._current_mesh.vertices))
-        self.repair_panel.status_text.setText(
-            f"Reduced: {original_count:,} → {new_count:,} faces "
-            f"({100 - int(ratio * 100)}% reduction)"
-        )
-
-    def _on_reduce_reset(self):
-        """Reset to original mesh."""
-        if self._original_mesh is None:
-            return
-        self._current_mesh = self._original_mesh.copy()
-        self.viewer.display_mesh(self._current_mesh)
-        self.reduction_panel.update_face_counts(
-            len(self._current_mesh.faces), len(self._current_mesh.vertices)
-        )
