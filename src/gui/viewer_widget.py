@@ -13,26 +13,49 @@ class ViewerWidget(QtInteractor):
         super().__init__(parent)
         self.set_background("white")
         self._has_mesh = False
+        self._saved_cam: dict | None = None
+
+    def _save_camera(self):
+        """Save current camera state."""
+        cam = self.camera
+        self._saved_cam = {
+            "position": cam.position,
+            "focal_point": cam.focal_point,
+            "up": cam.up,
+            "parallel_scale": cam.parallel_scale,
+        }
+
+    def _restore_camera(self):
+        """Restore previously saved camera state."""
+        if self._saved_cam is None:
+            return
+        cam = self.camera
+        cam.position = self._saved_cam["position"]
+        cam.focal_point = self._saved_cam["focal_point"]
+        cam.up = self._saved_cam["up"]
+        cam.parallel_scale = self._saved_cam["parallel_scale"]
 
     def display_mesh(
         self, mesh: trimesh.Trimesh, color="lightblue", opacity=1.0, reset_camera=True
     ):
         """Display a trimesh in the viewer."""
-        cam = self.camera.copy() if not reset_camera and self._has_mesh else None
+        if not reset_camera and self._has_mesh:
+            self._save_camera()
         self.clear()
         pv_mesh = pv.wrap(mesh)
         self.add_mesh(pv_mesh, color=color, opacity=opacity, show_edges=True)
         if reset_camera:
             self.reset_camera()
-        elif cam is not None:
-            self.camera.copy_from(cam)
+        else:
+            self._restore_camera()
         self._has_mesh = True
 
     def display_distortion(
         self, original: trimesh.Trimesh, processed: trimesh.Trimesh, reset_camera=False
     ):
         """Display processed mesh colored by vertex distance to original."""
-        cam = self.camera.copy() if not reset_camera and self._has_mesh else None
+        if not reset_camera and self._has_mesh:
+            self._save_camera()
         self.clear()
         pv_mesh = pv.wrap(processed)
 
@@ -41,7 +64,6 @@ class ViewerWidget(QtInteractor):
 
         pv_mesh["distance"] = distances
 
-        # Use percentile-based range for better contrast
         if len(distances) > 0 and np.max(distances) > 0:
             vmin = float(np.percentile(distances, 2))
             vmax = float(np.percentile(distances, 98))
@@ -61,8 +83,8 @@ class ViewerWidget(QtInteractor):
         )
         if reset_camera:
             self.reset_camera()
-        elif cam is not None:
-            self.camera.copy_from(cam)
+        else:
+            self._restore_camera()
         self._has_mesh = True
 
     def highlight_holes(self, mesh: trimesh.Trimesh, edges: list, color="yellow"):
